@@ -10,8 +10,8 @@
       "source": "./plugins/claude-lb-usage",
       "description": "Show per-API-key claude-lb usage and remaining limits in Claude Code.",
       "version": "0.1.0",
-      "homepage": "https://github.com/Soju06/claude-lb-usage",
-      "repository": "https://github.com/Soju06/claude-lb-usage",
+      "homepage": "https://github.com/tokmaxxing/claude-lb-usage",
+      "repository": "https://github.com/tokmaxxing/claude-lb-usage",
       "category": "productivity",
       "tags": ["claude-code", "usage", "statusline", "api-key"]
     }

@@ -21,7 +21,7 @@ Claude Code에서 현재 `claude-lb` 고객 API 키의 누적 사용량과 남�
 저장소를 받은 뒤 사용자 전체 범위로 설치:
 
 ```bash
-git clone https://github.com/Soju06/claude-lb-usage.git
+git clone https://github.com/tokmaxxing/claude-lb-usage.git
 cd claude-lb-usage
 python3 install.py
 ```
@@ -98,7 +98,7 @@ claude plugin install claude-lb-usage@claude-lb-tools
 GitHub 저장소에서는 로컬 경로 대신 다음처럼 등록할 수 있습니다:
 
 ```bash
-claude plugin marketplace add Soju06/claude-lb-usage
+claude plugin marketplace add tokmaxxing/claude-lb-usage
 claude plugin install claude-lb-usage@claude-lb-tools
 ```
 
