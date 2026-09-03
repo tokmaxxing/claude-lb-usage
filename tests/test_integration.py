@@ -55,12 +55,31 @@ class InstallerTests(unittest.TestCase):
             claude_dir = home / ".claude"
             claude_dir.mkdir()
             settings_path = claude_dir / "settings.json"
-            settings_path.write_text('{"theme": "dark"}\n', encoding="utf-8")
+            settings_path.write_text(
+                json.dumps(
+                    {
+                        "theme": "dark",
+                        "env": {
+                            "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
+                            "ANTHROPIC_AUTH_TOKEN": "existing-secret",
+                        },
+                    }
+                )
+                + "\n",
+                encoding="utf-8",
+            )
 
             result = installer.install(home=home)
 
             settings = json.loads(settings_path.read_text(encoding="utf-8"))
             self.assertEqual(settings["theme"], "dark")
+            self.assertEqual(
+                settings["env"],
+                {
+                    "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
+                    "ANTHROPIC_AUTH_TOKEN": "existing-secret",
+                },
+            )
             self.assertEqual(settings["statusLine"]["refreshInterval"], 60)
             self.assertEqual(settings["statusLine"]["command"], str(result.formatter_path))
             self.assertIn("name: lb-usage", result.skill_path.read_text(encoding="utf-8"))
