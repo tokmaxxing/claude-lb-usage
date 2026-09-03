@@ -259,7 +259,10 @@ def main() -> None:
     print(f"- formatter: {result.formatter_path}")
     if result.statusline_installed:
         print(f"- settings: {result.settings_path}")
-    print("Launch Claude Code with CLAUDE_LB_BASE_URL and CLAUDE_LB_API_KEY set, then run /lb-usage.")
+    print(
+        "Configure ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN in ~/.claude/settings.json env "
+        "or the launch shell, restart Claude Code, then run /lb-usage."
+    )
 
 
 if __name__ == "__main__":

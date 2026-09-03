@@ -8,7 +8,7 @@ Claude Code에서 현재 `claude-lb` 고객 API 키의 누적 사용량과 남�
 - statusline: 가장 많이 사용된 글로벌 비용 한도 또는 토큰 한도를 60초 간격으로 표시
 - Claude Code marketplace plugin: `/claude-lb-usage:usage`
 - user/project 범위 설치 및 안전한 제거
-- API 키를 Claude Code `settings.json`에 저장하지 않음
+- 셸 환경 변수와 Claude Code `settings.json`의 `env` 모두 지원
 
 ## 요구 사항
 
@@ -38,24 +38,39 @@ python3 install.py --scope project
 python3 install.py --no-statusline
 ```
 
-설치기는 기존 `settings.json`의 다른 설정을 보존합니다. 다른 statusline이나 같은 이름의 외부 파일이 있으면 중단하며, 의도적으로 교체할 때만 `--force`를 사용합니다.
+설치기는 기존 `settings.json`의 `env`를 포함한 다른 설정을 보존합니다. 다른 statusline이나 같은 이름의 외부 파일이 있으면 중단하며, 의도적으로 교체할 때만 `--force`를 사용합니다.
 
-Claude Code를 실행하는 셸에 다음 환경 변수를 설정합니다:
+### 고객 연결 설정
 
-```bash
-export CLAUDE_LB_BASE_URL="https://claude-lb.example.com"
-export CLAUDE_LB_API_KEY="sk-clb-..."
-claude
+일반적인 Claude Code 구성처럼 사용자 설정 `~/.claude/settings.json`의 `env`에 넣을 수 있습니다. 이미 다른 설정이 있다면 아래 `env` 항목만 병합합니다:
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
+    "ANTHROPIC_AUTH_TOKEN": "sk-clb-..."
+  }
+}
 ```
 
-기존 Claude Code 변수도 fallback으로 지원합니다:
+Claude Code는 `settings.json.env` 값을 각 세션과 statusline/skill 명령의 환경에 적용하므로 별도 formatter 설정은 필요하지 않습니다. 설정을 바꾼 뒤 Claude Code를 새로 시작하고 `/lb-usage`를 실행하거나 하단 statusline을 확인합니다.
+
+API 키를 사용자 설정 파일에 평문으로 두지 않으려면 Claude Code를 실행하는 셸에서 설정해도 됩니다:
 
 ```bash
 export ANTHROPIC_BASE_URL="https://claude-lb.example.com"
 export ANTHROPIC_AUTH_TOKEN="sk-clb-..."
+claude
 ```
 
-설정 후 `/lb-usage`를 실행하거나 하단 statusline을 확인합니다. 원본 JSON은 설치된 formatter에 `--json`을 전달해 확인할 수 있습니다.
+Claude Code 연결 설정과 사용량 조회 설정을 분리해야 할 때만 전용 변수를 사용합니다. 전용 변수가 있으면 `ANTHROPIC_*`보다 우선합니다:
+
+```bash
+export CLAUDE_LB_BASE_URL="https://claude-lb.example.com"
+export CLAUDE_LB_API_KEY="sk-clb-..."
+```
+
+동일한 전용 변수도 `settings.json.env`에 넣을 수 있습니다. 원본 JSON은 설치된 formatter에 `--json`을 전달해 확인할 수 있습니다. formatter를 Claude Code 밖에서 직접 실행할 때는 `settings.json.env`가 자동 주입되지 않으므로, 그 터미널에도 변수를 export해야 합니다.
 
 제거:
 
@@ -131,7 +146,8 @@ claude plugin validate .
 
 ## 보안
 
-- 독립 설치기는 API 키 값을 파일에 기록하지 않습니다.
+- 독립 설치기는 API 키 값을 새로 기록하거나 복사하지 않으며 기존 `settings.json.env`를 그대로 보존합니다.
+- `~/.claude/settings.json`에 API 키를 넣으면 로컬 파일에 평문으로 저장됩니다. 이 파일이나 프로젝트 설정을 저장소에 커밋하지 마세요.
 - 플러그인 `api_key` 옵션은 `sensitive: true`로 선언되어 있습니다.
 - 오류 메시지와 출력에는 API 키를 포함하지 않습니다.
 - 고객에게 upstream 공유 계정의 rate-limit 정보를 노출하지 말고, 서버가 고객 키별 한도만 반환하도록 구성해야 합니다.
