@@ -1,0 +1,176 @@
+#!/usr/bin/env python3
+# managed-by: claude-lb-usage
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from decimal import Decimal, InvalidOperation
+from typing import Any
+
+
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(
+        self,
+        req: urllib.request.Request,
+        fp: Any,
+        code: int,
+        msg: str,
+        headers: Any,
+        newurl: str,
+    ) -> None:
+        return None
+
+
+def _environment(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name, "").strip()
+        if value:
+            return value
+    return ""
+
+
+def _usage_url(base_url: str) -> str:
+    normalized = base_url.rstrip("/")
+    if normalized.endswith("/v1"):
+        return f"{normalized}/usage/self"
+    return f"{normalized}/v1/usage/self"
+
+
+def _fetch_usage(base_url: str, api_key: str) -> dict[str, Any]:
+    request = urllib.request.Request(
+        _usage_url(base_url),
+        headers={"x-api-key": api_key, "accept": "application/json"},
+    )
+    try:
+        opener = urllib.request.build_opener(_NoRedirect)
+        with opener.open(request, timeout=5) as response:
+            payload = json.load(response)
+    except (OSError, urllib.error.URLError, json.JSONDecodeError) as exc:
+        raise RuntimeError("usage unavailable") from exc
+    if not isinstance(payload, dict):
+        raise RuntimeError("invalid usage response")
+    return payload
+
+
+def _number(value: object, default: Decimal = Decimal(0)) -> Decimal:
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError):
+        return default
+
+
+def _display_number(value: object) -> str:
+    number = _number(value)
+    rendered = f"{number:.2f}"
+    return rendered.rstrip("0").rstrip(".") or "0"
+
+
+def _limits(payload: dict[str, Any]) -> list[dict[str, Any]]:
+    value = payload.get("limits", [])
+    return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
+
+
+def _used_percent(limit: dict[str, Any]) -> Decimal:
+    return _number(limit.get("used_percent"))
+
+
+def _compact(payload: dict[str, Any]) -> str:
+    limits = _limits(payload)
+    global_costs = [
+        limit
+        for limit in limits
+        if limit.get("limit_type") == "cost_usd" and limit.get("model_filter") is None
+    ]
+    shown = global_costs or limits
+    if not shown:
+        return f"LB: ${_display_number(payload.get('total_cost_usd'))} used"
+
+    limit = max(shown, key=_used_percent)
+    percent = _display_number(limit.get("used_percent"))
+    if limit.get("limit_type") == "cost_usd":
+        remaining = _number(limit.get("remaining_value")) / Decimal(1_000_000)
+        return f"LB: ${_display_number(remaining)} left · {percent}% used"
+    return f"LB: {_display_number(limit.get('remaining_value'))} tokens left · {percent}% used"
+
+
+def _full(payload: dict[str, Any]) -> str:
+    lines = [
+        "claude-lb usage",
+        (
+            f"Requests: {_display_number(payload.get('request_count'))} · "
+            f"Tokens: {_display_number(payload.get('total_tokens'))} · "
+            f"Cost: ${_display_number(payload.get('total_cost_usd'))}"
+        ),
+    ]
+    limits = _limits(payload)
+    if not limits:
+        lines.append("No limits configured.")
+        return "\n".join(lines)
+
+    for limit in limits:
+        window = str(limit.get("limit_window", "unknown"))
+        percent = _display_number(limit.get("used_percent"))
+        model = f" · model {limit['model_filter']}" if limit.get("model_filter") else ""
+        reset = str(limit.get("reset_at", "unknown"))
+        if limit.get("limit_type") == "cost_usd":
+            remaining = _number(limit.get("remaining_value")) / Decimal(1_000_000)
+            maximum = _number(limit.get("max_value")) / Decimal(1_000_000)
+            lines.append(
+                f"{window} cost: ${_display_number(remaining)} left of "
+                f"${_display_number(maximum)} ({percent}% used){model} · resets {reset}"
+            )
+        else:
+            limit_type = str(limit.get("limit_type", "tokens"))
+            lines.append(
+                f"{window} {limit_type}: {_display_number(limit.get('remaining_value'))} tokens left of "
+                f"{_display_number(limit.get('max_value'))} ({percent}% used){model} · resets {reset}"
+            )
+    return "\n".join(lines)
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description="Show the current claude-lb API key's usage and limits.")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--full", action="store_true", help="Show aggregate usage and every configured limit.")
+    mode.add_argument("--json", action="store_true", help="Print the raw usage response as formatted JSON.")
+    return parser
+
+
+def main() -> None:
+    args = _parser().parse_args()
+    base_url = _environment("CLAUDE_LB_BASE_URL", "CLAUDE_PLUGIN_OPTION_BASE_URL", "ANTHROPIC_BASE_URL")
+    api_key = _environment(
+        "CLAUDE_LB_API_KEY",
+        "CLAUDE_PLUGIN_OPTION_API_KEY",
+        "ANTHROPIC_AUTH_TOKEN",
+        "ANTHROPIC_API_KEY",
+    )
+    error_prefix = "claude-lb usage" if args.full or args.json else "LB"
+    if not base_url:
+        print(f"{error_prefix}: base URL is not configured")
+        return
+    if not api_key:
+        print(f"{error_prefix}: API key is not configured")
+        return
+
+    try:
+        payload = _fetch_usage(base_url, api_key)
+    except RuntimeError as exc:
+        print(f"{error_prefix}: {exc}")
+        return
+
+    if args.json:
+        json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
+        print()
+    elif args.full:
+        print(_full(payload))
+    else:
+        print(_compact(payload))
+
+
+if __name__ == "__main__":
+    main()
