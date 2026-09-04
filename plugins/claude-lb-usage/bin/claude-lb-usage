@@ -8,7 +8,8 @@ import os
 import sys
 import urllib.error
 import urllib.request
-from decimal import Decimal, InvalidOperation
+from datetime import datetime, timezone
+from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
 
 
@@ -69,6 +70,18 @@ def _display_number(value: object) -> str:
     return rendered.rstrip("0").rstrip(".") or "0"
 
 
+def _money_from_microdollars(value: object) -> str:
+    amount = _number(value) / Decimal(1_000_000)
+    return f"${amount:,.2f}"
+
+
+def _quantity(value: object) -> str:
+    number = _number(value)
+    if number == number.to_integral_value():
+        return f"{int(number):,}"
+    return f"{number:,.2f}".rstrip("0").rstrip(".")
+
+
 def _limits(payload: dict[str, Any]) -> list[dict[str, Any]]:
     value = payload.get("limits", [])
     return [item for item in value if isinstance(item, dict)] if isinstance(value, list) else []
@@ -76,6 +89,101 @@ def _limits(payload: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _used_percent(limit: dict[str, Any]) -> Decimal:
     return _number(limit.get("used_percent"))
+
+
+def _clamped_percent(limit: dict[str, Any]) -> Decimal:
+    return min(Decimal(100), max(Decimal(0), _used_percent(limit)))
+
+
+def _percent_label(percent: Decimal) -> str:
+    if Decimal(0) < percent < Decimal(1):
+        return "<1% used"
+    rounded = percent.quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    return f"{rounded}% used"
+
+
+def _progress_bar(percent: Decimal, width: int = 32) -> str:
+    scaled = percent * width / Decimal(100)
+    full = int(scaled.to_integral_value(rounding=ROUND_FLOOR))
+    fraction = scaled - full
+    partials = ("", "▏", "▎", "▍", "▌", "▋", "▊", "▉")
+    partial = partials[int((fraction * 8).to_integral_value(rounding=ROUND_FLOOR))]
+    empty = width - full - bool(partial)
+    return "█" * full + partial + "░" * max(0, empty)
+
+
+def _model_name(value: object) -> str:
+    model = str(value or "").removeprefix("claude-")
+    parts = [part for part in model.split("-") if part]
+    if parts and len(parts[-1]) == 8 and parts[-1].isdigit():
+        parts.pop()
+    return " ".join(part.capitalize() for part in parts) or "Selected model"
+
+
+def _window_title(limit: dict[str, Any]) -> str:
+    window = str(limit.get("limit_window", "unknown"))
+    titles = {
+        "3h": "Current session",
+        "daily": "Current day",
+        "weekly": "Current week",
+        "monthly": "Current month",
+    }
+    title = titles.get(window, f"Current {window} window")
+    model = limit.get("model_filter")
+    if model:
+        return f"{title} ({_model_name(model)} only)"
+    if window == "3h":
+        return title
+    return f"{title} (all models)"
+
+
+def _window_sort_key(limit: dict[str, Any]) -> tuple[int, int, str]:
+    window = str(limit.get("limit_window", "unknown"))
+    order = {"3h": 0, "daily": 1, "weekly": 2, "monthly": 3}
+    return (order.get(window, 99), 1 if limit.get("model_filter") else 0, _window_title(limit))
+
+
+def _clock(value: datetime) -> str:
+    hour = value.hour % 12 or 12
+    suffix = "am" if value.hour < 12 else "pm"
+    minute = f":{value.minute:02d}" if value.minute else ""
+    return f"{hour}{minute}{suffix}"
+
+
+def _reset_label(value: object) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        return "Reset time unavailable"
+    try:
+        parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        local = parsed.astimezone()
+        now = datetime.now().astimezone()
+    except ValueError:
+        return f"Resets {raw}"
+
+    if local.date() == now.date():
+        when = _clock(local)
+    elif local.year == now.year:
+        when = f"{local:%b} {local.day}, {_clock(local)}"
+    else:
+        when = f"{local:%b} {local.day}, {local.year}, {_clock(local)}"
+    zone = local.tzname() or "local time"
+    return f"Resets {when} ({zone})"
+
+
+def _limit_amount(limit: dict[str, Any]) -> str:
+    if limit.get("limit_type") == "cost_usd":
+        current = _money_from_microdollars(limit.get("current_value"))
+        maximum = _money_from_microdollars(limit.get("max_value"))
+        remaining = _money_from_microdollars(limit.get("remaining_value"))
+        return f"{current} / {maximum} spent · {remaining} left"
+
+    current = _quantity(limit.get("current_value"))
+    maximum = _quantity(limit.get("max_value"))
+    remaining = _quantity(limit.get("remaining_value"))
+    return f"{current} / {maximum} tokens used · {remaining} left"
 
 
 def _compact(payload: dict[str, Any]) -> str:
@@ -98,37 +206,33 @@ def _compact(payload: dict[str, Any]) -> str:
 
 
 def _full(payload: dict[str, Any]) -> str:
-    lines = [
-        "claude-lb usage",
-        (
-            f"Requests: {_display_number(payload.get('request_count'))} · "
-            f"Tokens: {_display_number(payload.get('total_tokens'))} · "
-            f"Cost: ${_display_number(payload.get('total_cost_usd'))}"
-        ),
-    ]
+    lines = ["Claude LB Usage"]
     limits = _limits(payload)
     if not limits:
-        lines.append("No limits configured.")
+        lines.extend(
+            [
+                "",
+                "No usage limits configured.",
+                (
+                    f"{_quantity(payload.get('request_count'))} requests · "
+                    f"{_quantity(payload.get('total_tokens'))} tokens · "
+                    f"${_number(payload.get('total_cost_usd')):,.2f} spent"
+                ),
+            ]
+        )
         return "\n".join(lines)
 
-    for limit in limits:
-        window = str(limit.get("limit_window", "unknown"))
-        percent = _display_number(limit.get("used_percent"))
-        model = f" · model {limit['model_filter']}" if limit.get("model_filter") else ""
-        reset = str(limit.get("reset_at", "unknown"))
-        if limit.get("limit_type") == "cost_usd":
-            remaining = _number(limit.get("remaining_value")) / Decimal(1_000_000)
-            maximum = _number(limit.get("max_value")) / Decimal(1_000_000)
-            lines.append(
-                f"{window} cost: ${_display_number(remaining)} left of "
-                f"${_display_number(maximum)} ({percent}% used){model} · resets {reset}"
-            )
-        else:
-            limit_type = str(limit.get("limit_type", "tokens"))
-            lines.append(
-                f"{window} {limit_type}: {_display_number(limit.get('remaining_value'))} tokens left of "
-                f"{_display_number(limit.get('max_value'))} ({percent}% used){model} · resets {reset}"
-            )
+    for limit in sorted(limits, key=_window_sort_key):
+        percent = _clamped_percent(limit)
+        lines.extend(
+            [
+                "",
+                _window_title(limit),
+                f"{_progress_bar(percent)}  {_percent_label(percent)}",
+                _limit_amount(limit),
+                _reset_label(limit.get("reset_at")),
+            ]
+        )
     return "\n".join(lines)
 
 

@@ -1,7 +1,7 @@
 {
   "name": "claude-lb-usage",
   "description": "Show per-API-key claude-lb usage and remaining limits.",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "author": {
     "name": "Soju06"
   },

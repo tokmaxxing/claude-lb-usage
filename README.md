@@ -49,6 +49,20 @@ Claude Code에서 다음 명령을 실행하세요.
 
 누적 요청 수, 토큰, 비용, 남은 한도와 초기화 시간이 표시됩니다.
 
+```text
+Claude LB Usage
+
+Current session
+▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1% used
+$293.86 / $32,812.50 spent · $32,518.64 left
+Resets 5:13pm (KST)
+
+Current week (all models)
+▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  <1% used
+$293.86 / $157,500.00 spent · $157,206.14 left
+Resets Sep 11, 2:13pm (KST)
+```
+
 ## 하단 상태줄 표시
 
 플러그인 명령과 함께 남은 한도를 Claude Code 하단에 계속 표시하려면 터미널에서 다음을 실행하세요. Python 3.11 이상이 필요합니다.
