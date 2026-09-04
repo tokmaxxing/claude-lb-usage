@@ -295,7 +295,7 @@ class MetadataTests(unittest.TestCase):
         entry = marketplace["plugins"][0]
         self.assertEqual(entry["name"], manifest["name"])
         self.assertEqual(entry["version"], manifest["version"])
-        self.assertTrue(manifest["userConfig"]["api_key"]["sensitive"])
+        self.assertNotIn("userConfig", manifest)
 
 
 if __name__ == "__main__":
