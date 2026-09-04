@@ -3,11 +3,13 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import runpy
 import subprocess
 import sys
 import tempfile
 import threading
 import unittest
+from decimal import Decimal
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
@@ -215,6 +217,15 @@ class _RedirectTargetHandler(BaseHTTPRequestHandler):
 
 
 class FormatterTests(unittest.TestCase):
+    def test_progress_bar_uses_full_cells_without_partial_glyph_seams(self) -> None:
+        progress_bar = runpy.run_path(str(FORMATTER))["_progress_bar"]
+
+        self.assertEqual(progress_bar(Decimal("0")), "░" * 32)
+        self.assertEqual(progress_bar(Decimal("0.1")), "█" + "░" * 31)
+        self.assertEqual(progress_bar(Decimal("3")), "█" + "░" * 31)
+        self.assertEqual(progress_bar(Decimal("99")), "█" * 31 + "░")
+        self.assertEqual(progress_bar(Decimal("100")), "█" * 32)
+
     def test_formatter_uses_api_key_and_renders_compact_full_and_json(self) -> None:
         server = ThreadingHTTPServer(("127.0.0.1", 0), _UsageHandler)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -231,6 +242,7 @@ class FormatterTests(unittest.TestCase):
                 env.pop(name, None)
             env["CLAUDE_LB_BASE_URL"] = f"http://127.0.0.1:{server.server_port}/v1"
             env["CLAUDE_LB_API_KEY"] = "test-secret"
+            env["CLAUDE_LB_TIMEZONE"] = "Asia/Seoul"
 
             compact = subprocess.run([FORMATTER], check=True, capture_output=True, text=True, env=env)
             full = subprocess.run([FORMATTER, "--full"], check=True, capture_output=True, text=True, env=env)
@@ -246,7 +258,9 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("Current month (all models)", full.stdout)
         self.assertIn("████████░░░░░░░░░░░░░░░░░░░░░░░░  25% used", full.stdout)
         self.assertIn("$2.50 / $10.00 spent · $7.50 left", full.stdout)
+        self.assertIn("9am (KST)", full.stdout)
         self.assertNotIn("Requests:", full.stdout)
+        self.assertFalse(any(character in full.stdout for character in "▏▎▍▌▋▊▉"))
         self.assertEqual(json.loads(raw.stdout), _UsageHandler.payload)
         hook_result = json.loads(hook.stdout)
         self.assertEqual(hook_result["decision"], "block")

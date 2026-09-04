@@ -9,8 +9,9 @@ import sys
 import urllib.error
 import urllib.request
 from datetime import datetime, timezone
-from decimal import ROUND_FLOOR, ROUND_HALF_UP, Decimal, InvalidOperation
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 
 class _NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -104,12 +105,12 @@ def _percent_label(percent: Decimal) -> str:
 
 def _progress_bar(percent: Decimal, width: int = 32) -> str:
     scaled = percent * width / Decimal(100)
-    full = int(scaled.to_integral_value(rounding=ROUND_FLOOR))
-    fraction = scaled - full
-    partials = ("", "▏", "▎", "▍", "▌", "▋", "▊", "▉")
-    partial = partials[int((fraction * 8).to_integral_value(rounding=ROUND_FLOOR))]
-    empty = width - full - bool(partial)
-    return "█" * full + partial + "░" * max(0, empty)
+    full = int(scaled.to_integral_value(rounding=ROUND_HALF_UP))
+    if Decimal(0) < percent < Decimal(100):
+        full = min(width - 1, max(1, full))
+    else:
+        full = min(width, max(0, full))
+    return "█" * full + "░" * (width - full)
 
 
 def _model_name(value: object) -> str:
@@ -150,6 +151,16 @@ def _clock(value: datetime) -> str:
     return f"{hour}{minute}{suffix}"
 
 
+def _local_timezone() -> Any:
+    configured = _environment("CLAUDE_LB_TIMEZONE")
+    if configured:
+        try:
+            return ZoneInfo(configured)
+        except ZoneInfoNotFoundError:
+            pass
+    return datetime.now().astimezone().tzinfo
+
+
 def _reset_label(value: object) -> str:
     raw = str(value or "").strip()
     if not raw:
@@ -158,8 +169,9 @@ def _reset_label(value: object) -> str:
         parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
         if parsed.tzinfo is None:
             parsed = parsed.replace(tzinfo=timezone.utc)
-        local = parsed.astimezone()
-        now = datetime.now().astimezone()
+        local_timezone = _local_timezone()
+        local = parsed.astimezone(local_timezone)
+        now = datetime.now(local_timezone)
     except ValueError:
         return f"Resets {raw}"
 

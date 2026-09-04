@@ -9,7 +9,7 @@
       "name": "claude-lb-usage",
       "source": "./plugins/claude-lb-usage",
       "description": "Show per-API-key claude-lb usage and remaining limits without a model call.",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "homepage": "https://github.com/tokmaxxing/claude-lb-usage",
       "repository": "https://github.com/tokmaxxing/claude-lb-usage",
       "category": "productivity",
