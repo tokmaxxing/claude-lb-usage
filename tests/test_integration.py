@@ -234,8 +234,11 @@ class FormatterTests(unittest.TestCase):
             thread.join(timeout=2)
 
         self.assertEqual(compact.stdout.strip(), "LB: $7.5 left · 25% used")
-        self.assertIn("Requests: 2 · Tokens: 1500 · Cost: $0.25", full.stdout)
-        self.assertIn("monthly cost: $7.5 left of $10", full.stdout)
+        self.assertIn("Claude LB Usage", full.stdout)
+        self.assertIn("Current month (all models)", full.stdout)
+        self.assertIn("████████░░░░░░░░░░░░░░░░░░░░░░░░  25% used", full.stdout)
+        self.assertIn("$2.50 / $10.00 spent · $7.50 left", full.stdout)
+        self.assertNotIn("Requests:", full.stdout)
         self.assertEqual(json.loads(raw.stdout), _UsageHandler.payload)
         self.assertEqual(_UsageHandler.request_path, "/v1/usage/self")
         self.assertEqual(_UsageHandler.api_key, "test-secret")
