@@ -13,6 +13,7 @@ Claude LB를 사용 중이라면 일반적으로 `~/.claude/settings.json`에 �
 
 ```json
 {
+  "respondToBashCommands": false,
   "env": {
     "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
     "ANTHROPIC_AUTH_TOKEN": "sk-clb-..."
@@ -20,7 +21,7 @@ Claude LB를 사용 중이라면 일반적으로 `~/.claude/settings.json`에 �
 }
 ```
 
-이미 설정되어 있다면 변경할 필요가 없습니다. 없다면 기존 파일 전체를 교체하지 말고 `env` 항목만 병합한 뒤 Claude Code를 다시 시작하세요.
+이미 `env`가 설정되어 있다면 `respondToBashCommands`만 추가하면 됩니다. 이 값을 `false`로 설정하면 아래 사용량 명령을 실행한 뒤 Claude 모델이 별도로 응답하지 않습니다. 기존 파일 전체를 교체하지 말고 필요한 항목만 병합한 뒤 Claude Code를 다시 시작하세요.
 
 ## Claude Code에서 설치
 
@@ -39,15 +40,15 @@ Claude Code를 실행한 뒤 다음 명령을 순서대로 입력하세요.
 /reload-plugins
 ```
 
-## 사용
+## 사용: 모델 호출 없음
 
 Claude Code에서 다음 명령을 실행하세요.
 
 ```text
-/claude-lb-usage:usage
+! claude-lb-usage --full
 ```
 
-누적 요청 수, 토큰, 비용, 남은 한도와 초기화 시간이 표시됩니다.
+`!`로 시작하는 Claude Code shell mode 명령입니다. 플러그인의 실행 파일이 API를 조회하고 결과를 직접 그리므로 모델 토큰을 사용하지 않으며, 출력 후 현재 Claude Code 세션으로 돌아옵니다.
 
 ```text
 Claude LB Usage
@@ -73,7 +74,7 @@ cd claude-lb-usage
 python3 install.py
 ```
 
-설치 프로그램은 `/lb-usage` 명령도 추가하고, 기존 `settings.json`의 다른 설정은 보존합니다. 다른 상태줄이 이미 설정되어 있다면 이를 덮어쓰지 않고 중단합니다. 기존 상태줄을 유지하려면 다음과 같이 설치하세요.
+설치 프로그램은 기존 `settings.json`의 다른 설정을 보존합니다. 다른 상태줄이 이미 설정되어 있다면 이를 덮어쓰지 않고 중단합니다. formatter만 설치하고 기존 상태줄을 유지하려면 다음과 같이 설치하세요.
 
 ```bash
 python3 install.py --no-statusline

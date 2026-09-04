@@ -24,7 +24,6 @@ class SetupError(RuntimeError):
 @dataclass(frozen=True, slots=True)
 class Installation:
     settings_path: Path
-    skill_path: Path
     formatter_path: Path
     statusline_installed: bool
 
@@ -41,7 +40,7 @@ def install(
     claude_dir = _claude_dir(scope=scope, cwd=cwd, home=home, config_dir=config_dir)
     settings_path = _settings_path(claude_dir)
     formatter_path = claude_dir / FORMATTER_NAME
-    skill_path = claude_dir / "skills" / "lb-usage" / "SKILL.md"
+    legacy_skill_path = claude_dir / "skills" / "lb-usage" / "SKILL.md"
 
     if not FORMATTER_SOURCE.is_file():
         raise SetupError(f"Bundled formatter is missing: {FORMATTER_SOURCE}")
@@ -61,22 +60,21 @@ def install(
             "use --no-statusline or rerun with --force."
         )
 
-    _refuse_foreign_file(skill_path, "lb-usage skill", force=force)
     _refuse_foreign_file(formatter_path, "usage formatter", force=force)
 
     formatter = FORMATTER_SOURCE.read_text(encoding="utf-8")
-    skill = _render_standalone_skill(formatter_path)
     if statusline:
         settings["statusLine"] = desired_statusline
 
     _atomic_write(formatter_path, formatter, mode=0o700)
-    _atomic_write(skill_path, skill, mode=0o600)
+    if _remove_managed_file(legacy_skill_path):
+        _remove_empty_directory(legacy_skill_path.parent)
+        _remove_empty_directory(legacy_skill_path.parent.parent)
     if statusline:
         _atomic_write(settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n", mode=0o600)
 
     return Installation(
         settings_path=settings_path,
-        skill_path=skill_path,
         formatter_path=formatter_path,
         statusline_installed=statusline,
     )
@@ -92,7 +90,7 @@ def uninstall(
     claude_dir = _claude_dir(scope=scope, cwd=cwd, home=home, config_dir=config_dir)
     settings_path = _settings_path(claude_dir)
     formatter_path = claude_dir / FORMATTER_NAME
-    skill_path = claude_dir / "skills" / "lb-usage" / "SKILL.md"
+    legacy_skill_path = claude_dir / "skills" / "lb-usage" / "SKILL.md"
     removed: list[Path] = []
 
     settings = _load_settings(settings_path)
@@ -101,13 +99,12 @@ def uninstall(
         _atomic_write(settings_path, json.dumps(settings, ensure_ascii=False, indent=2) + "\n", mode=0o600)
         removed.append(settings_path)
 
-    for path in (skill_path, formatter_path):
-        if path.is_file() and MANAGED_MARKER in path.read_text(encoding="utf-8"):
-            path.unlink()
+    for path in (legacy_skill_path, formatter_path):
+        if _remove_managed_file(path):
             removed.append(path)
 
-    _remove_empty_directory(skill_path.parent)
-    _remove_empty_directory(skill_path.parent.parent)
+    _remove_empty_directory(legacy_skill_path.parent)
+    _remove_empty_directory(legacy_skill_path.parent.parent)
     return removed
 
 
@@ -174,22 +171,11 @@ def _refuse_foreign_file(path: Path, description: str, *, force: bool) -> None:
         raise SetupError(f"Refusing to replace existing {description} at {path}; rerun with --force.")
 
 
-def _render_standalone_skill(formatter_path: Path) -> str:
-    command = f"{shlex.quote(str(formatter_path))} --full"
-    return f"""---
-name: lb-usage
-description: Show this customer's claude-lb API-key usage, remaining limits, and reset times.
-disable-model-invocation: true
----
-
-<!-- {MANAGED_MARKER} -->
-
-## Live claude-lb usage
-
-!`{command}`
-
-Return the live usage output above verbatim. Do not infer missing limits or substitute upstream account quota.
-"""
+def _remove_managed_file(path: Path) -> bool:
+    if not path.is_file() or MANAGED_MARKER not in path.read_text(encoding="utf-8"):
+        return False
+    path.unlink()
+    return True
 
 
 def _atomic_write(path: Path, content: str, *, mode: int) -> None:
@@ -224,7 +210,7 @@ def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Install the standalone claude-lb usage integration for Claude Code.")
     parser.add_argument("--scope", choices=("user", "project"), default="user")
     parser.add_argument("--force", action="store_true", help="Replace foreign files or status-line configuration.")
-    parser.add_argument("--no-statusline", action="store_true", help="Install /lb-usage without changing statusLine.")
+    parser.add_argument("--no-statusline", action="store_true", help="Install only the formatter executable.")
     parser.add_argument(
         "--uninstall",
         action="store_true",
@@ -255,13 +241,12 @@ def main() -> None:
         raise SystemExit(str(exc)) from exc
 
     print("Installed claude-lb usage integration:")
-    print(f"- skill: {result.skill_path}")
     print(f"- formatter: {result.formatter_path}")
     if result.statusline_installed:
         print(f"- settings: {result.settings_path}")
     print(
         "Configure ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN in ~/.claude/settings.json env "
-        "or the launch shell, restart Claude Code, then run /lb-usage."
+        "or the launch shell, then run the installed formatter."
     )
 
 
