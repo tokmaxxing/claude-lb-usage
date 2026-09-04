@@ -37,7 +37,7 @@ class InstallerTests(unittest.TestCase):
                 env=env,
             )
             self.assertIn("Installed claude-lb usage integration", installed.stdout)
-            self.assertTrue((config_dir / "skills" / "lb-usage" / "SKILL.md").is_file())
+            self.assertTrue((config_dir / installer.FORMATTER_NAME).is_file())
 
             removed = subprocess.run(
                 [ROOT / "install.sh", "--uninstall"],
@@ -82,8 +82,6 @@ class InstallerTests(unittest.TestCase):
             )
             self.assertEqual(settings["statusLine"]["refreshInterval"], 60)
             self.assertEqual(settings["statusLine"]["command"], str(result.formatter_path))
-            self.assertIn("name: lb-usage", result.skill_path.read_text(encoding="utf-8"))
-            self.assertNotIn("sk-clb-", result.skill_path.read_text(encoding="utf-8"))
             self.assertEqual(result.formatter_path.stat().st_mode & 0o777, 0o700)
 
     def test_project_install_uses_project_claude_directory(self) -> None:
@@ -95,7 +93,7 @@ class InstallerTests(unittest.TestCase):
             result = installer.install(scope="project", cwd=project, home=root)
 
             self.assertEqual(result.settings_path, project / ".claude" / "settings.json")
-            self.assertEqual(result.skill_path, project / ".claude" / "skills" / "lb-usage" / "SKILL.md")
+            self.assertEqual(result.formatter_path, project / ".claude" / installer.FORMATTER_NAME)
 
     def test_foreign_statusline_is_not_replaced(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
@@ -112,7 +110,7 @@ class InstallerTests(unittest.TestCase):
             self.assertEqual(settings_path.read_text(encoding="utf-8"), original)
             self.assertFalse((claude_dir / installer.FORMATTER_NAME).exists())
 
-    def test_no_statusline_installs_skill_without_touching_settings(self) -> None:
+    def test_no_statusline_installs_formatter_without_touching_settings(self) -> None:
         with tempfile.TemporaryDirectory() as temporary:
             home = Path(temporary)
             claude_dir = home / ".claude"
@@ -124,7 +122,7 @@ class InstallerTests(unittest.TestCase):
             result = installer.install(home=home, statusline=False)
 
             self.assertFalse(result.statusline_installed)
-            self.assertTrue(result.skill_path.is_file())
+            self.assertTrue(result.formatter_path.is_file())
             self.assertEqual(settings_path.read_text(encoding="utf-8"), original)
 
     def test_uninstall_removes_only_managed_content(self) -> None:
@@ -139,10 +137,19 @@ class InstallerTests(unittest.TestCase):
             removed = installer.uninstall(home=home)
 
             self.assertIn(result.formatter_path, removed)
-            self.assertIn(result.skill_path, removed)
             self.assertFalse(result.formatter_path.exists())
-            self.assertFalse(result.skill_path.exists())
             self.assertEqual(json.loads(settings_path.read_text(encoding="utf-8")), {"theme": "dark"})
+
+    def test_install_removes_legacy_managed_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            legacy_skill = home / ".claude" / "skills" / "lb-usage" / "SKILL.md"
+            legacy_skill.parent.mkdir(parents=True)
+            legacy_skill.write_text(f"<!-- {installer.MANAGED_MARKER} -->\n", encoding="utf-8")
+
+            installer.install(home=home, statusline=False)
+
+            self.assertFalse(legacy_skill.exists())
 
 
 class _UsageHandler(BaseHTTPRequestHandler):
@@ -299,6 +306,7 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(entry["name"], manifest["name"])
         self.assertEqual(entry["version"], manifest["version"])
         self.assertNotIn("userConfig", manifest)
+        self.assertFalse((ROOT / "plugins" / "claude-lb-usage" / "skills").exists())
 
 
 if __name__ == "__main__":
