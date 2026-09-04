@@ -241,7 +241,20 @@ def _parser() -> argparse.ArgumentParser:
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--full", action="store_true", help="Show aggregate usage and every configured limit.")
     mode.add_argument("--json", action="store_true", help="Print the raw usage response as formatted JSON.")
+    mode.add_argument("--hook", action="store_true", help=argparse.SUPPRESS)
     return parser
+
+
+def _hook_result(message: str) -> None:
+    json.dump({"decision": "block", "reason": message}, sys.stdout, ensure_ascii=False)
+    print()
+
+
+def _show_message(message: str, hook: bool) -> None:
+    if hook:
+        _hook_result(message)
+    else:
+        print(message)
 
 
 def main() -> None:
@@ -253,21 +266,26 @@ def main() -> None:
         "ANTHROPIC_AUTH_TOKEN",
         "ANTHROPIC_API_KEY",
     )
-    error_prefix = "claude-lb usage" if args.full or args.json else "LB"
+    error_prefix = "claude-lb usage" if args.full or args.json or args.hook else "LB"
     if not base_url:
-        print(f"{error_prefix}: base URL is not configured")
+        message = f"{error_prefix}: base URL is not configured"
+        _show_message(message, args.hook)
         return
     if not api_key:
-        print(f"{error_prefix}: API key is not configured")
+        message = f"{error_prefix}: API key is not configured"
+        _show_message(message, args.hook)
         return
 
     try:
         payload = _fetch_usage(base_url, api_key)
     except RuntimeError as exc:
-        print(f"{error_prefix}: {exc}")
+        message = f"{error_prefix}: {exc}"
+        _show_message(message, args.hook)
         return
 
-    if args.json:
+    if args.hook:
+        _hook_result(_full(payload))
+    elif args.json:
         json.dump(payload, sys.stdout, ensure_ascii=False, indent=2)
         print()
     elif args.full:

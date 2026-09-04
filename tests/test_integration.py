@@ -235,6 +235,7 @@ class FormatterTests(unittest.TestCase):
             compact = subprocess.run([FORMATTER], check=True, capture_output=True, text=True, env=env)
             full = subprocess.run([FORMATTER, "--full"], check=True, capture_output=True, text=True, env=env)
             raw = subprocess.run([FORMATTER, "--json"], check=True, capture_output=True, text=True, env=env)
+            hook = subprocess.run([FORMATTER, "--hook"], check=True, capture_output=True, text=True, env=env)
         finally:
             server.shutdown()
             server.server_close()
@@ -247,6 +248,10 @@ class FormatterTests(unittest.TestCase):
         self.assertIn("$2.50 / $10.00 spent · $7.50 left", full.stdout)
         self.assertNotIn("Requests:", full.stdout)
         self.assertEqual(json.loads(raw.stdout), _UsageHandler.payload)
+        hook_result = json.loads(hook.stdout)
+        self.assertEqual(hook_result["decision"], "block")
+        self.assertIn("Claude LB Usage", hook_result["reason"])
+        self.assertIn("$2.50 / $10.00 spent · $7.50 left", hook_result["reason"])
         self.assertEqual(_UsageHandler.request_path, "/v1/usage/self")
         self.assertEqual(_UsageHandler.api_key, "test-secret")
 
@@ -306,7 +311,16 @@ class MetadataTests(unittest.TestCase):
         self.assertEqual(entry["name"], manifest["name"])
         self.assertEqual(entry["version"], manifest["version"])
         self.assertNotIn("userConfig", manifest)
-        self.assertFalse((ROOT / "plugins" / "claude-lb-usage" / "skills").exists())
+        skill = ROOT / "plugins" / "claude-lb-usage" / "skills" / "usage" / "SKILL.md"
+        self.assertTrue(skill.is_file())
+        hooks = json.loads(
+            (ROOT / "plugins" / "claude-lb-usage" / "hooks" / "hooks.json").read_text(encoding="utf-8")
+        )
+        expansion = hooks["hooks"]["UserPromptExpansion"]
+        self.assertEqual(expansion[0]["matcher"], "^claude-lb-usage:usage$")
+        handler = expansion[0]["hooks"][0]
+        self.assertEqual(handler["command"], "${CLAUDE_PLUGIN_ROOT}/bin/claude-lb-usage")
+        self.assertEqual(handler["args"], ["--hook"])
 
 
 if __name__ == "__main__":

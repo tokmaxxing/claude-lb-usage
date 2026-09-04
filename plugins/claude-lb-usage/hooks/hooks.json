@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "UserPromptExpansion": [
+      {
+        "matcher": "^claude-lb-usage:usage$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/claude-lb-usage",
+            "args": ["--hook"],
+            "timeout": 10
+          }
+        ]
+      }
+    ]
+  }
+}
