@@ -9,6 +9,19 @@ Claude Code에서 내 API 키의 누적 사용량과 남은 한도를 확인하�
 - Claude LB 주소
 - 본인 API 키 (`sk-clb-...`)
 
+Claude LB를 사용 중이라면 일반적으로 `~/.claude/settings.json`에 이미 다음 설정이 있습니다.
+
+```json
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
+    "ANTHROPIC_AUTH_TOKEN": "sk-clb-..."
+  }
+}
+```
+
+이미 설정되어 있다면 변경할 필요가 없습니다. 없다면 기존 파일 전체를 교체하지 말고 `env` 항목만 병합한 뒤 Claude Code를 다시 시작하세요.
+
 ## Claude Code에서 설치
 
 Claude Code를 실행한 뒤 다음 명령을 순서대로 입력하세요.
@@ -18,10 +31,7 @@ Claude Code를 실행한 뒤 다음 명령을 순서대로 입력하세요.
 /plugin install claude-lb-usage@claude-lb-tools
 ```
 
-설치 화면에서 사용자 범위(`User scope`)를 선택하고 다음 값을 입력합니다.
-
-- `base_url`: 관리자에게 받은 Claude LB 주소
-- `api_key`: 본인 API 키
+설치 화면에서 사용자 범위(`User scope`)를 선택하세요. 플러그인은 위의 Claude Code 연결 설정을 그대로 사용하므로 주소나 API 키를 다시 입력하지 않습니다.
 
 설치 후 재로딩 안내가 표시되면 다음 명령을 실행하세요.
 
@@ -38,21 +48,6 @@ Claude Code에서 다음 명령을 실행하세요.
 ```
 
 누적 요청 수, 토큰, 비용, 남은 한도와 초기화 시간이 표시됩니다.
-
-## settings.json으로 연결 설정
-
-Claude LB를 이미 `~/.claude/settings.json`에서 사용 중이라면 다음과 같이 설정할 수 있습니다.
-
-```json
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
-    "ANTHROPIC_AUTH_TOKEN": "sk-clb-..."
-  }
-}
-```
-
-기존 설정이 있다면 파일 전체를 교체하지 말고 `env` 항목만 병합하세요. 변경 후 Claude Code를 다시 시작해야 적용됩니다.
 
 ## 하단 상태줄 표시
 
@@ -80,7 +75,7 @@ python3 install.py --uninstall
 
 - API 키를 저장소나 공유 설정에 커밋하지 마세요.
 - `settings.json`의 API 키는 로컬 파일에 평문으로 저장됩니다.
-- 플러그인 설치 화면에서 입력한 API 키는 민감정보 옵션으로 처리됩니다.
+- 플러그인은 API 키를 별도 설정으로 복사하거나 저장하지 않습니다.
 
 ## License
 

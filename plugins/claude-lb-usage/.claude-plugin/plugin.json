@@ -1,27 +1,12 @@
 {
   "name": "claude-lb-usage",
   "description": "Show per-API-key claude-lb usage and remaining limits.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "Soju06"
   },
   "homepage": "https://github.com/tokmaxxing/claude-lb-usage",
   "repository": "https://github.com/tokmaxxing/claude-lb-usage",
   "license": "MIT",
-  "keywords": ["claude-code", "claude-lb", "usage", "api-key"],
-  "userConfig": {
-    "base_url": {
-      "type": "string",
-      "title": "claude-lb base URL",
-      "description": "Base URL of the claude-lb deployment, without /v1/usage/self.",
-      "required": true
-    },
-    "api_key": {
-      "type": "string",
-      "title": "claude-lb API key",
-      "description": "Downstream sk-clb API key used to read only this customer's usage.",
-      "sensitive": true,
-      "required": true
-    }
-  }
+  "keywords": ["claude-code", "claude-lb", "usage", "api-key"]
 }
