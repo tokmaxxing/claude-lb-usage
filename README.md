@@ -15,12 +15,13 @@ Claude LB를 사용 중이라면 일반적으로 `~/.claude/settings.json`에 �
 {
   "env": {
     "ANTHROPIC_BASE_URL": "https://claude-lb.example.com",
-    "ANTHROPIC_AUTH_TOKEN": "sk-clb-..."
+    "ANTHROPIC_AUTH_TOKEN": "sk-clb-...",
+    "CLAUDE_LB_TIMEZONE": "Asia/Seoul"
   }
 }
 ```
 
-이미 위 `env`가 설정되어 있다면 변경할 것이 없습니다. 기존 파일 전체를 교체하지 말고 필요한 항목만 병합한 뒤 Claude Code를 다시 시작하세요.
+`CLAUDE_LB_TIMEZONE`은 선택 사항입니다. 설정하지 않으면 Claude Code가 실행되는 시스템의 로컬 시간대를 사용합니다. 원격 서버의 시간대가 UTC라면 실제 사용자의 시간대(예: `Asia/Seoul`)를 지정하세요. 기존 파일 전체를 교체하지 말고 필요한 항목만 병합한 뒤 Claude Code를 다시 시작하세요.
 
 ## Claude Code에서 설치
 
@@ -53,12 +54,12 @@ Claude Code에서 다음 명령을 실행하세요.
 Claude LB Usage
 
 Current session
-▎░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1% used
+█░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  1% used
 $293.86 / $32,812.50 spent · $32,518.64 left
 Resets 5:13pm (KST)
 
 Current week (all models)
-▏░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  <1% used
+█░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░  <1% used
 $293.86 / $157,500.00 spent · $157,206.14 left
 Resets Sep 11, 2:13pm (KST)
 ```
